@@ -31,10 +31,13 @@ pub fn kernel_main() -> ! {
     }
 
     unsafe {
-        let start = &_sheap as *const u8 as usize;
-        let end = &_eheap as *const u8 as usize;
+        let start = core::ptr::addr_of!(_sheap) as usize;
+        let end = core::ptr::addr_of!(_eheap) as usize;
+        let size = end - start;
 
-        crate::allocator::ALLOCATOR.lock().init(start, end);
+        crate::allocator::ALLOCATOR
+            .lock()
+            .init(start as *mut u8, size);
     }
 
     println!("Hello, World!");
