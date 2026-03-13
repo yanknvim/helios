@@ -25,4 +25,10 @@ SECTIONS {
     . = ALIGN(4);
     . += 128 * 1024; /* 128KB */
     __stack_top = .;
+
+    . = ALIGN(4096);
+    _sheap = .;
+
+    _heap_size = 128 * 1024 * 1024; /* 128KB */
+    _eheap  = _sheap + _heap_size;
 }

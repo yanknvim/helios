@@ -1,10 +1,16 @@
 #![no_main]
 #![no_std]
 
+mod allocator;
 mod console;
 mod trap;
 
 use core::arch::naked_asm;
+
+unsafe extern "C" {
+    static _sheap: u8;
+    static _eheap: u8;
+}
 
 #[unsafe(no_mangle)]
 #[unsafe(link_section = ".text.boot")]
@@ -19,9 +25,16 @@ pub extern "C" fn boot() -> ! {
 
 #[unsafe(no_mangle)]
 pub fn kernel_main() -> ! {
-    let addr_trap_entry = trap::trap_entry as usize;
+    let addr_trap_entry = trap::trap_entry as *const usize;
     unsafe {
         core::arch::asm!("csrw stvec, {trap_entry}", trap_entry = in(reg) addr_trap_entry);
+    }
+
+    unsafe {
+        let start = &_sheap as *const u8 as usize;
+        let end = &_eheap as *const u8 as usize;
+
+        crate::allocator::ALLOCATOR.lock().init(start, end);
     }
 
     println!("Hello, World!");
