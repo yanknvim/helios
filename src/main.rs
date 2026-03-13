@@ -1,8 +1,9 @@
 #![no_main]
 #![no_std]
 
+mod console;
+
 use core::arch::naked_asm;
-use sbi_rt::console_write_byte;
 
 #[unsafe(no_mangle)]
 #[unsafe(link_section = ".text.boot")]
@@ -17,9 +18,7 @@ pub extern "C" fn boot() -> ! {
 
 #[unsafe(no_mangle)]
 pub fn kernel_main() -> ! {
-    for &c in b"Hello, World!\n" {
-        console_write_byte(c);
-    }
+    println!("Hello, World!");
 
     loop {}
 }
