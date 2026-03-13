@@ -1,0 +1,7 @@
+[package]
+name = "helios"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+sbi-rt = "0.0.3"
