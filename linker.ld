@@ -3,6 +3,7 @@ ENTRY(boot)
 SECTIONS {
     . = 0x80200000;
 
+    _stext = .;
     .text :{
         KEEP(*(.text.boot));
         *(.text .text.*);

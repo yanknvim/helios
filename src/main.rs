@@ -1,10 +1,13 @@
 #![no_main]
 #![no_std]
+#![feature(pointer_is_aligned_to)]
 
 mod allocator;
 mod console;
+mod page;
 mod trap;
 
+use core::alloc::Layout;
 use core::arch::naked_asm;
 
 unsafe extern "C" {
@@ -39,6 +42,25 @@ pub fn kernel_main() -> ! {
             .lock()
             .init(start as *mut u8, size);
     }
+    println!("Allocation Ready");
+
+    extern crate alloc;
+
+    let layout = Layout::from_size_align(4096, 4096).unwrap();
+    let table = unsafe { alloc::alloc::alloc(layout) as *mut PageTable };
+    page::init_page(table);
+
+    let root_ppn = (table as u32) >> 12;
+    let satp = (1 << 31) | root_ppn;
+
+    unsafe {
+        core::arch::asm!(
+            "csrw satp, {satp}",
+            "sfence.vma",
+            satp = in(reg) satp,
+        );
+    }
+    println!("Paging Ready");
 
     println!("Hello, World!");
 
@@ -46,6 +68,8 @@ pub fn kernel_main() -> ! {
 }
 
 use core::panic::PanicInfo;
+
+use crate::page::PageTable;
 
 #[panic_handler]
 fn panic(info: &PanicInfo<'_>) -> ! {
