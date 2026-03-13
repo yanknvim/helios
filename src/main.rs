@@ -2,6 +2,7 @@
 #![no_std]
 
 mod console;
+mod trap;
 
 use core::arch::naked_asm;
 
@@ -18,6 +19,11 @@ pub extern "C" fn boot() -> ! {
 
 #[unsafe(no_mangle)]
 pub fn kernel_main() -> ! {
+    let addr_trap_entry = trap::trap_entry as usize;
+    unsafe {
+        core::arch::asm!("csrw stvec, {trap_entry}", trap_entry = in(reg) addr_trap_entry);
+    }
+
     println!("Hello, World!");
 
     loop {}
