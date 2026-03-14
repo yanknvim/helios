@@ -5,10 +5,16 @@
 mod allocator;
 mod console;
 mod page;
+mod process;
 mod trap;
 
 use core::alloc::Layout;
 use core::arch::naked_asm;
+
+use crate::page::{PageTable, init_page};
+use crate::process::{ProcessManager, ProcessState};
+
+static mut PROCESS_MANAGER: ProcessManager = ProcessManager::new();
 
 unsafe extern "C" {
     static _sheap: u8;
@@ -47,29 +53,47 @@ pub fn kernel_main() -> ! {
     extern crate alloc;
 
     let layout = Layout::from_size_align(4096, 4096).unwrap();
-    let table = unsafe { alloc::alloc::alloc(layout) as *mut PageTable };
-    page::init_page(table);
+    let root_table = unsafe { alloc::alloc::alloc(layout) as *mut PageTable };
+    init_page(root_table);
 
-    let root_ppn = (table as u32) >> 12;
-    let satp = (1 << 31) | root_ppn;
+    println!("Page Ready");
 
-    unsafe {
-        core::arch::asm!(
-            "csrw satp, {satp}",
-            "sfence.vma",
-            satp = in(reg) satp,
-        );
+    let pm = unsafe { &mut *core::ptr::addr_of_mut!(PROCESS_MANAGER) };
+    pm.procs[0].table = root_table;
+    pm.procs[0].state = ProcessState::Runnable;
+    pm.current = 0;
+
+    pm.create_process(proc1 as u32);
+    pm.create_process(proc2 as u32);
+
+    println!("Process Ready");
+
+    loop {
+        pm.schedule();
     }
-    println!("Paging Ready");
+}
 
-    println!("Hello, World!");
+fn proc1() -> ! {
+    loop {
+        println!("A");
+        unsafe {
+            let pm = &mut *core::ptr::addr_of_mut!(PROCESS_MANAGER);
+            pm.schedule();
+        }
+    }
+}
 
-    loop {}
+fn proc2() -> ! {
+    loop {
+        println!("B");
+        unsafe {
+            let pm = &mut *core::ptr::addr_of_mut!(PROCESS_MANAGER);
+            pm.schedule();
+        }
+    }
 }
 
 use core::panic::PanicInfo;
-
-use crate::page::PageTable;
 
 #[panic_handler]
 fn panic(info: &PanicInfo<'_>) -> ! {
