@@ -1,6 +1,6 @@
 use crate::page::{PageTable, init_page};
 extern crate alloc;
-use alloc::alloc::{Layout, alloc};
+use alloc::alloc::{Layout, alloc_zeroed};
 
 const PROCS_MAX: usize = 8;
 
@@ -53,7 +53,7 @@ impl ProcessManager {
             .find(|(_, p)| matches!(p.state, ProcessState::Unused))
         {
             let layout = Layout::from_size_align(4096, 4096).unwrap();
-            let table_ptr = unsafe { alloc(layout) as *mut PageTable };
+            let table_ptr = unsafe { alloc_zeroed(layout) as *mut PageTable };
 
             init_page(table_ptr);
 

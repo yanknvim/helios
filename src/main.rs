@@ -53,7 +53,7 @@ pub fn kernel_main() -> ! {
     extern crate alloc;
 
     let layout = Layout::from_size_align(4096, 4096).unwrap();
-    let root_table = unsafe { alloc::alloc::alloc(layout) as *mut PageTable };
+    let root_table = unsafe { alloc::alloc::alloc_zeroed(layout) as *mut PageTable };
     init_page(root_table);
 
     println!("Page Ready");
