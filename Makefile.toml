@@ -1,0 +1,16 @@
+[tasks.build-user]
+workspace = false
+command = "cargo"
+args = ["build", "--bin", "user", "--release"]
+
+[tasks.bin-user]
+dependencies = [ "build-user" ]
+workspace = false
+command = "cargo"
+args = ["objcopy", "-p", "user", "--release", "--", "-O", "binary", "target/user.bin"]
+
+[tasks.build-kernel]
+dependencies = [ "bin-user" ]
+workspace = false
+command = "cargo"
+args = ["build", "--bin", "kernel"]

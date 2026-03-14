@@ -4,7 +4,7 @@ use core::ptr;
 extern crate alloc;
 use alloc::alloc::{Layout, alloc_zeroed};
 
-const PAGE_SIZE: u32 = 4 * 1024;
+pub const PAGE_SIZE: u32 = 4 * 1024;
 
 unsafe extern "C" {
     static _stext: u8;
@@ -52,18 +52,4 @@ pub fn map_page(table: *mut PageTable, vaddr: *const u32, paddr: *const u32, fla
     let table0_paddr = (table1.table[vpn1] >> 10) << 12;
     let table0 = unsafe { &mut *(table0_paddr as *mut PageTable) };
     table0.table[vpn0] = ((paddr as u32 / PAGE_SIZE) << 10) | flags.bits() | PteFlags::V.bits();
-}
-
-pub fn init_page(table: *mut PageTable) {
-    let start = unsafe { ptr::addr_of!(_stext) as usize };
-    let end = unsafe { ptr::addr_of!(_eheap) as usize };
-
-    for addr in (start..end).step_by(PAGE_SIZE as usize) {
-        map_page(
-            table,
-            addr as *const u32,
-            addr as *const u32,
-            PteFlags::R | PteFlags::W | PteFlags::X,
-        );
-    }
 }

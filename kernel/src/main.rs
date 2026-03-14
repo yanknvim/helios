@@ -8,13 +8,13 @@ mod page;
 mod process;
 mod trap;
 
-use core::alloc::Layout;
 use core::arch::naked_asm;
+use core::ptr;
 
-use crate::page::{PageTable, init_page};
 use crate::process::{ProcessManager, ProcessState};
 
 static mut PROCESS_MANAGER: ProcessManager = ProcessManager::new();
+const USER_BIN: &[u8] = include_bytes!("../../target/user.bin");
 
 unsafe extern "C" {
     static _sheap: u8;
@@ -52,19 +52,17 @@ pub fn kernel_main() -> ! {
 
     extern crate alloc;
 
-    let layout = Layout::from_size_align(4096, 4096).unwrap();
-    let root_table = unsafe { alloc::alloc::alloc_zeroed(layout) as *mut PageTable };
-    init_page(root_table);
-
-    println!("Page Ready");
-
     let pm = unsafe { &mut *core::ptr::addr_of_mut!(PROCESS_MANAGER) };
-    pm.procs[0].table = root_table;
+
+    // init
+    pm.create_process(ptr::null_mut(), 0);
     pm.procs[0].state = ProcessState::Runnable;
     pm.current = 0;
 
-    pm.create_process(proc1 as u32);
-    pm.create_process(proc2 as u32);
+    pm.create_process(
+        USER_BIN.as_ptr() as *const u32,
+        core::mem::size_of_val(USER_BIN),
+    );
 
     println!("Process Ready");
 

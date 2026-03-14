@@ -1,8 +1,16 @@
-use crate::page::{PageTable, init_page};
+use core::arch::{asm, naked_asm};
+
+use crate::page::{PAGE_SIZE, PageTable, PteFlags, map_page};
 extern crate alloc;
 use alloc::alloc::{Layout, alloc_zeroed};
 
 const PROCS_MAX: usize = 8;
+const USER_BASE: usize = 0x1000000;
+
+unsafe extern "C" {
+    static _stext: usize;
+    static _eheap: usize;
+}
 
 pub struct ProcessManager {
     pub procs: [Process; PROCS_MAX],
@@ -21,7 +29,6 @@ pub struct Process {
 #[derive(Copy, Clone, Debug, PartialEq, Eq)]
 pub enum ProcessState {
     Unused,
-    Idle,
     Runnable,
 }
 
@@ -37,6 +44,21 @@ impl Process {
     }
 }
 
+#[unsafe(naked)]
+extern "C" fn user_entry() -> ! {
+    const SSTATUS_SPIE: u32 = 1 << 5;
+
+    naked_asm!(
+        "la a0, {sepc}",
+        "csrw sepc, a0",
+        "la a0, {sstatus}",
+        "csrw sstatus, a0",
+        "sret",
+        sepc = const USER_BASE,
+        sstatus = const SSTATUS_SPIE,
+    );
+}
+
 impl ProcessManager {
     pub const fn new() -> Self {
         Self {
@@ -45,7 +67,7 @@ impl ProcessManager {
         }
     }
 
-    pub fn create_process(&mut self, pc: u32) {
+    pub fn create_process(&mut self, image: *const u32, image_size: usize) {
         if let Some((i, proc)) = self
             .procs
             .iter_mut()
@@ -55,14 +77,37 @@ impl ProcessManager {
             let layout = Layout::from_size_align(4096, 4096).unwrap();
             let table_ptr = unsafe { alloc_zeroed(layout) as *mut PageTable };
 
-            init_page(table_ptr);
+            let start = core::ptr::addr_of!(_stext) as usize;
+            let end = core::ptr::addr_of!(_eheap) as usize;
+            for addr in (start..end).step_by(PAGE_SIZE as usize) {
+                map_page(
+                    table_ptr,
+                    addr as *const u32,
+                    addr as *const u32,
+                    PteFlags::R | PteFlags::W | PteFlags::X,
+                );
+            }
 
-            proc.table = table_ptr;
+            for offset in (0..image_size).step_by(PAGE_SIZE as usize) {
+                let layout = Layout::from_size_align(4096, 4096).unwrap();
+                let page = unsafe { alloc_zeroed(layout) as *mut u32 };
+
+                unsafe {
+                    core::ptr::copy(image.offset(offset as isize), page, PAGE_SIZE as usize);
+                }
+                map_page(
+                    table_ptr,
+                    (USER_BASE + offset) as *const u32,
+                    page,
+                    PteFlags::U | PteFlags::R | PteFlags::W | PteFlags::X,
+                );
+            }
 
             proc.pid = i + 1;
             proc.state = ProcessState::Runnable;
             proc.context = Context::new();
-            proc.context.ra = pc;
+            proc.context.ra = user_entry as u32;
+            proc.table = table_ptr;
 
             let stack_top = proc.stack.as_ptr() as usize + core::mem::size_of_val(&proc.stack);
             proc.context.sp = stack_top as u32;
