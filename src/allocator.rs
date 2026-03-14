@@ -1,7 +1,6 @@
 mod bump;
 extern crate alloc;
 
-use bump::BumpAllocator;
 use linked_list_allocator::LockedHeap;
 
 #[global_allocator]
@@ -19,7 +18,7 @@ impl<T> Locked<T> {
         }
     }
 
-    pub fn lock(&self) -> spin::MutexGuard<T> {
+    pub fn lock(&self) -> spin::MutexGuard<'_, T> {
         self.inner.lock()
     }
 }

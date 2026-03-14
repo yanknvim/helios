@@ -110,7 +110,7 @@ pub extern "C" fn trap_entry() {
     );
 }
 
-extern "C" fn handle_trap(frame: *mut TrapFrame) {
+extern "C" fn handle_trap(_frame: *mut TrapFrame) {
     let scause: u32;
     let stval: u32;
     let sepc: u32;

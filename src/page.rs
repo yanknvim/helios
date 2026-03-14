@@ -2,7 +2,7 @@ use bitflags::bitflags;
 use core::ptr;
 
 extern crate alloc;
-use alloc::alloc::{Layout, alloc, dealloc};
+use alloc::alloc::{Layout, alloc};
 
 const PAGE_SIZE: u32 = 4 * 1024;
 
@@ -43,7 +43,7 @@ pub fn map_page(table: *mut PageTable, vaddr: *const u32, paddr: *const u32, fla
     let vpn0 = (vaddr as usize >> 12) & 0x3ff;
 
     let table1 = unsafe { &mut *table };
-    if (table1.table[vpn1] & PteFlags::V.bits() as u32) == 0 {
+    if (table1.table[vpn1] & PteFlags::V.bits()) == 0 {
         let layout = Layout::from_size_align(4096, 4096).expect("Failed to allocate");
         let ptr = unsafe { alloc(layout) };
         table1.table[vpn1] = ((ptr as u32 / PAGE_SIZE) << 10) | PteFlags::V.bits();
