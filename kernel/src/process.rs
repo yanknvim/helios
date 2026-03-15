@@ -1,8 +1,8 @@
 use core::arch::{asm, naked_asm};
 
-use crate::page::{map_page, PageTable, PteFlags, PAGE_SIZE};
+use crate::page::{PAGE_SIZE, PageTable, PteFlags, map_page};
 extern crate alloc;
-use alloc::alloc::{alloc_zeroed, Layout};
+use alloc::alloc::{Layout, alloc_zeroed};
 
 const PROCS_MAX: usize = 8;
 const USER_BASE: usize = 0x1000000;
