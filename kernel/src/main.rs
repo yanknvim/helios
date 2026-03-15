@@ -19,6 +19,8 @@ const USER_BIN: &[u8] = include_bytes!("../../target/user.bin");
 unsafe extern "C" {
     static _sheap: u8;
     static _eheap: u8;
+    static __bss: u8;
+    static __bss_end: u8;
 }
 
 #[unsafe(no_mangle)]
@@ -34,6 +36,10 @@ pub extern "C" fn boot() -> ! {
 
 #[unsafe(no_mangle)]
 pub fn kernel_main() -> ! {
+    unsafe {
+        core::ptr::write_bytes(__bss as *mut u8, 0, __bss_end as usize - __bss as usize);
+    }
+
     let addr_trap_entry = trap::trap_entry as *const usize;
     unsafe {
         core::arch::asm!("csrw stvec, {trap_entry}", trap_entry = in(reg) addr_trap_entry);
@@ -57,6 +63,7 @@ pub fn kernel_main() -> ! {
     // init
     pm.create_process(ptr::null_mut(), 0);
     pm.procs[0].state = ProcessState::Runnable;
+    pm.procs[0].pid = 0;
     pm.current = 0;
 
     pm.create_process(
@@ -66,29 +73,8 @@ pub fn kernel_main() -> ! {
 
     println!("Process Ready");
 
-    loop {
-        pm.schedule();
-    }
-}
-
-fn proc1() -> ! {
-    loop {
-        println!("A");
-        unsafe {
-            let pm = &mut *core::ptr::addr_of_mut!(PROCESS_MANAGER);
-            pm.schedule();
-        }
-    }
-}
-
-fn proc2() -> ! {
-    loop {
-        println!("B");
-        unsafe {
-            let pm = &mut *core::ptr::addr_of_mut!(PROCESS_MANAGER);
-            pm.schedule();
-        }
-    }
+    pm.schedule();
+    panic!("IDLE");
 }
 
 use core::panic::PanicInfo;

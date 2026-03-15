@@ -1,36 +1,40 @@
+use shared::SysCall;
+
+use crate::print;
+
 #[repr(C)]
 struct TrapFrame {
-    ra: u32,
-    gp: u32,
-    tp: u32,
-    t0: u32,
-    t1: u32,
-    t2: u32,
-    t3: u32,
-    t4: u32,
-    t5: u32,
-    t6: u32,
-    a0: u32,
-    a1: u32,
-    a2: u32,
-    a3: u32,
-    a4: u32,
-    a5: u32,
-    a6: u32,
-    a7: u32,
-    s0: u32,
-    s1: u32,
-    s2: u32,
-    s3: u32,
-    s4: u32,
-    s5: u32,
-    s6: u32,
-    s7: u32,
-    s8: u32,
-    s9: u32,
-    s10: u32,
-    s11: u32,
-    sp: u32,
+    pub ra: u32,
+    pub gp: u32,
+    pub tp: u32,
+    pub t0: u32,
+    pub t1: u32,
+    pub t2: u32,
+    pub t3: u32,
+    pub t4: u32,
+    pub t5: u32,
+    pub t6: u32,
+    pub a0: u32,
+    pub a1: u32,
+    pub a2: u32,
+    pub a3: u32,
+    pub a4: u32,
+    pub a5: u32,
+    pub a6: u32,
+    pub a7: u32,
+    pub s0: u32,
+    pub s1: u32,
+    pub s2: u32,
+    pub s3: u32,
+    pub s4: u32,
+    pub s5: u32,
+    pub s6: u32,
+    pub s7: u32,
+    pub s8: u32,
+    pub s9: u32,
+    pub s10: u32,
+    pub s11: u32,
+    pub sp: u32,
 }
 
 #[unsafe(naked)]
@@ -38,7 +42,7 @@ struct TrapFrame {
 pub extern "C" fn trap_entry() {
     core::arch::naked_asm!(
         ".align 4",
-        "csrw sscratch, sp",
+        "csrrw sp, sscratch, sp",
         "addi sp, sp, -4 * 31",
         "sw ra, 4 * 0(sp)",
         "sw gp, 4 * 1(sp)",
@@ -70,10 +74,16 @@ pub extern "C" fn trap_entry() {
         "sw s9, 4 * 27(sp)",
         "sw s10, 4 * 28(sp)",
         "sw s11, 4 * 29(sp)",
+
         "csrr a0, sscratch",
         "sw a0, 4 * 30(sp)",
+
+        "addi a0, sp, 4 * 31",
+        "csrw sscratch, a0",
+
         "mv a0, sp",
         "call {handle_trap}",
+
         "lw ra, 4 * 0(sp)",
         "lw gp, 4 * 1(sp)",
         "lw tp, 4 * 2(sp)",
@@ -105,15 +115,20 @@ pub extern "C" fn trap_entry() {
         "lw s10, 4 * 28(sp)",
         "lw s11, 4 * 29(sp)",
         "lw sp, 4 * 30(sp)",
+
         "sret",
         handle_trap = sym handle_trap,
     );
 }
 
-extern "C" fn handle_trap(_frame: *mut TrapFrame) {
+enum SCause {
+    ECALL = 8,
+}
+
+extern "C" fn handle_trap(frame: *mut TrapFrame) {
     let scause: u32;
     let stval: u32;
-    let sepc: u32;
+    let mut sepc: u32;
 
     unsafe {
         core::arch::asm!("csrr {}, scause", out(reg) scause);
@@ -121,8 +136,28 @@ extern "C" fn handle_trap(_frame: *mut TrapFrame) {
         core::arch::asm!("csrr {}, sepc", out(reg) sepc);
     }
 
-    panic!(
-        "unexpected trap: scause={:#x}, stval={:#x}, sepc={:#x}",
-        scause, stval, sepc
-    );
+    if scause == SCause::ECALL as u32 {
+        handle_syscall(frame);
+        sepc += 4;
+    } else {
+        panic!(
+            "unexpected trap: scause={:#x}, stval={:#x}, sepc={:#x}",
+            scause, stval, sepc
+        );
+    }
+
+    unsafe {
+        core::arch::asm!("csrw sepc, {sepc}", sepc = in(reg) sepc);
+    }
+}
+
+fn handle_syscall(frame: *mut TrapFrame) {
+    unsafe {
+        let mut frame = &mut *frame;
+        if frame.a3 == SysCall::PUTCHAR as u32 {
+            print!("{}", frame.a0 as u8 as char);
+        } else {
+            panic!("unexpected syscall a3={:#x}", frame.a3);
+        }
+    }
 }

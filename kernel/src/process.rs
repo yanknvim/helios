@@ -1,8 +1,8 @@
 use core::arch::{asm, naked_asm};
 
-use crate::page::{PAGE_SIZE, PageTable, PteFlags, map_page};
+use crate::page::{map_page, PageTable, PteFlags, PAGE_SIZE};
 extern crate alloc;
-use alloc::alloc::{Layout, alloc_zeroed};
+use alloc::alloc::{alloc_zeroed, Layout};
 
 const PROCS_MAX: usize = 8;
 const USER_BASE: usize = 0x1000000;
@@ -49,6 +49,7 @@ extern "C" fn user_entry() -> ! {
     const SSTATUS_SPIE: u32 = 1 << 5;
 
     naked_asm!(
+        "csrw sscratch, sp",
         "la a0, {sepc}",
         "csrw sepc, a0",
         "la a0, {sstatus}",
@@ -92,9 +93,17 @@ impl ProcessManager {
                 let layout = Layout::from_size_align(4096, 4096).unwrap();
                 let page = unsafe { alloc_zeroed(layout) as *mut u32 };
 
+                let remaining = image_size - offset;
+                let copy_size = if PAGE_SIZE as usize <= remaining {
+                    PAGE_SIZE as usize
+                } else {
+                    remaining
+                };
+
                 unsafe {
-                    core::ptr::copy(image.offset(offset as isize), page, PAGE_SIZE as usize);
+                    core::ptr::copy(image.offset(offset as isize), page, copy_size);
                 }
+
                 map_page(
                     table_ptr,
                     (USER_BASE + offset) as *const u32,

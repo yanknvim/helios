@@ -14,3 +14,8 @@ dependencies = [ "bin-user" ]
 workspace = false
 command = "cargo"
 args = ["build", "--bin", "kernel"]
+
+[tasks.run]
+workspace = false
+command = "cargo"
+args = ["run"]
